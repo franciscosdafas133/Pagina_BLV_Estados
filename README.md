@@ -106,6 +106,13 @@ python -m app.cli recalc             # recalcula KPIs y alertas (p.ej. tras camb
 
 Abrir **http://127.0.0.1:8000/**. Ficha de empresa en `/empresas/{id}`.
 
+### Opción C — scrape en vivo (modo despliegue)
+
+Con `LIVE_SCRAPE=1` (valor por defecto) la app sincroniza el catálogo de la SMV
+al arrancar y **scrapea cada empresa bajo demanda** la primera vez que se abre
+(cacheando el resultado). Es el modo usado en internet — ver
+[DESPLIEGUE.md](DESPLIEGUE.md) para publicarlo en Render.com.
+
 ### Pruebas
 
 ```bash
