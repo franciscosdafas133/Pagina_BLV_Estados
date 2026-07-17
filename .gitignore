@@ -8,3 +8,4 @@ venv/
 *.xbrl
 .DS_Store
 .env
+ingest_full.log

@@ -1,8 +1,12 @@
 # Configuración de despliegue en Render.com (plan gratuito).
-# El scrape en vivo puede tardar ~30-40s, por eso se usa un solo worker con
-# timeout amplio. El plan gratuito NO permite disco persistente: la BD SQLite
-# vive en el almacenamiento efímero del contenedor (la caché se regenera al
-# reiniciar; el catálogo de empresas se re-sincroniza al arrancar).
+#
+# La app scrapea la SMV BAJO DEMANDA: al arrancar sincroniza el catálogo de
+# empresas (buscable al instante) y, al abrir una empresa, descarga sus estados
+# financieros de la SMV en vivo (~30-40s la primera vez) y los cachea. Un solo
+# worker con timeout amplio porque el scrape en vivo puede tardar. El plan
+# gratuito no permite disco persistente: la BD vive en /tmp (efímero); si el
+# servicio reinicia, el catálogo se re-sincroniza y las empresas se re-cachean
+# al consultarse.
 services:
   - type: web
     name: analisis-fundamental-smv
