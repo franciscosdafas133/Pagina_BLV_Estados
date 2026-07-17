@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.db
+*.db-journal
+.pytest_cache/
+.venv/
+venv/
+*.xbrl
+.DS_Store
+.env
