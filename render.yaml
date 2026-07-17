@@ -1,6 +1,8 @@
 # Configuración de despliegue en Render.com (plan gratuito).
 # El scrape en vivo puede tardar ~30-40s, por eso se usa un solo worker con
-# timeout amplio. La BD SQLite vive en un disco persistente.
+# timeout amplio. El plan gratuito NO permite disco persistente: la BD SQLite
+# vive en el almacenamiento efímero del contenedor (la caché se regenera al
+# reiniciar; el catálogo de empresas se re-sincroniza al arrancar).
 services:
   - type: web
     name: analisis-fundamental-smv
@@ -14,8 +16,4 @@ services:
       - key: LIVE_SCRAPE
         value: "1"
       - key: SMV_DB_PATH
-        value: "/var/data/smv_analisis.db"
-    disk:
-      name: smv-data
-      mountPath: /var/data
-      sizeGB: 1
+        value: "/tmp/smv_analisis.db"
