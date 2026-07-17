@@ -199,6 +199,27 @@ def ensure_company_data_endpoint(company_id: int, db: Session = Depends(get_db),
     return result
 
 
+@app.get("/api/live-years")
+def live_years():
+    """Años que la app scrapea bajo demanda (para que el frontend los pida uno a uno)."""
+    from app.services.live import LIVE_YEARS
+    return {"years": sorted(LIVE_YEARS, reverse=True), "liveScrape": LIVE_SCRAPE}
+
+
+@app.post("/api/companies/{company_id}/ensure-year")
+def ensure_company_year_endpoint(company_id: int, year: int,
+                                 db: Session = Depends(get_db), force: bool = False):
+    """Scrapea UN año de la empresa. Petición corta que no supera el timeout de
+    hosting gratuito; el frontend llama esto por cada año, secuencialmente."""
+    c = _company_or_404(db, company_id)
+    if not LIVE_SCRAPE:
+        from app.services.live import year_has_data
+        return {"status": "cached" if year_has_data(db, company_id, year) else "empty",
+                "periods": 0, "year": year}
+    from app.services.live import ensure_company_year
+    return ensure_company_year(db, c, year, force=force)
+
+
 @app.get("/api/companies/{company_id}")
 def get_company(company_id: int, db: Session = Depends(get_db)):
     c = _company_or_404(db, company_id)

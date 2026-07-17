@@ -62,6 +62,21 @@ def ensure_catalog(db: Session, force: bool = False) -> int:
     return db.scalar(select(func.count(Company.id))) or 0
 
 
+def year_has_data(db: Session, company_id: int, year: int) -> bool:
+    """True solo si el año tiene un filing ORIGINAL (no un balance derivado del
+    comparativo de otro año). Al scrapear el año N, el XBRL trae el balance de
+    cierre de N-1 como comparativo, creando un registro parcial de N-1; ese
+    registro derivado NO cuenta como "año ya scrapeado"."""
+    from app.models import FinancialStatement
+    return db.scalar(
+        select(func.count(FinancialStatement.id)).where(
+            FinancialStatement.company_id == company_id,
+            FinancialStatement.year == year,
+            FinancialStatement.period_type == "quarter_ytd",  # solo filings originales
+            FinancialStatement.is_derived.is_(False))
+    ) > 0
+
+
 def ensure_company_data(db: Session, company: Company,
                         years: list[int] | None = None, force: bool = False) -> dict:
     """Garantiza que la empresa tenga datos: si no, la scrapea de la SMV en vivo.
@@ -91,3 +106,35 @@ def ensure_company_data(db: Session, company: Company,
         if periods == 0 and not company_has_data(db, company.id):
             return {"status": "empty", "periods": 0}
         return {"status": "scraped", "periods": periods}
+
+
+def ensure_company_year(db: Session, company: Company, year: int,
+                        force: bool = False) -> dict:
+    """Scrapea UN solo año de una empresa (petición corta que no supera el
+    timeout de hosting gratuito). Recalcula KPIs con la historia completa
+    disponible tras añadir el año.
+
+    Devuelve {'status': 'cached'|'scraped'|'empty', 'periods': int, 'year': int}.
+    """
+    if not force and year_has_data(db, company.id, year):
+        return {"status": "cached", "periods": 0, "year": year}
+
+    lock = _lock_for(company.id)
+    with lock:
+        if not force and year_has_data(db, company.id, year):
+            return {"status": "cached", "periods": 0, "year": year}
+        scraper = SMVScraper()
+        periods = 0
+        try:
+            try:
+                periods = ingest_company_year(db, scraper, company, year)
+            except Exception:  # noqa: BLE001
+                periods = 0
+            # Recalcular toda la empresa: los crecimientos interanuales y los
+            # promedios dependen de años vecinos ya cargados.
+            recalc_company(db, company)
+        finally:
+            scraper.close()
+        if periods == 0 and not year_has_data(db, company.id, year):
+            return {"status": "empty", "periods": 0, "year": year}
+        return {"status": "scraped", "periods": periods, "year": year}

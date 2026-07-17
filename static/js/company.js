@@ -10,6 +10,30 @@ const app = $("app");
 let currentPeriod = { year: null, semester: null, periodType: "semester" };
 let chartMode = { periodType: "semester" };
 
+// Scrapea la empresa AÑO POR AÑO (peticiones cortas que no superan el timeout
+// del hosting gratuito). Muestra progreso "Descargando 2025… 2024… 2023…".
+async function scrapeByYear(name, { force = false } = {}) {
+  let years;
+  try {
+    years = (await api("/api/live-years")).years;
+  } catch (_) {
+    years = [2025, 2024, 2023];
+  }
+  let anyData = false;
+  for (let i = 0; i < years.length; i++) {
+    const y = years[i];
+    app.replaceChildren(loadingScreen(
+      `Obteniendo datos de ${name} desde la SMV…`,
+      `Descargando el año ${y} en tiempo real (${i + 1} de ${years.length}). ` +
+      `Cada año tarda unos segundos; por favor espera.`));
+    try {
+      const r = await apiPost(`/api/companies/${companyId}/ensure-year`, { year: y, force });
+      if (r.status === "scraped" || r.status === "cached") anyData = anyData || r.status === "scraped";
+    } catch (_) { /* un año que falla no aborta el resto */ }
+  }
+  return anyData;
+}
+
 async function init() {
   mountSearch($("search-slot"));
   try {
@@ -17,17 +41,14 @@ async function init() {
     // Si la empresa no tiene periodos cacheados, scrapear de la SMV en vivo
     if (!info.availablePeriods || info.availablePeriods.length === 0) {
       const name = info.company?.name || "la empresa";
-      app.replaceChildren(loadingScreen(
-        "Obteniendo datos de la SMV…",
-        `Descargando y procesando los estados financieros de ${name} en tiempo real. Esto puede tardar entre 15 y 40 segundos la primera vez.`));
-      const r = await apiPost(`/api/companies/${companyId}/ensure-data`);
-      if (r.status === "empty") {
+      await scrapeByYear(name);
+      info = await api(`/api/companies/${companyId}`);
+      if (!info.availablePeriods || info.availablePeriods.length === 0) {
         app.replaceChildren(emptyState(
           "La SMV no tiene información financiera procesable para esta empresa " +
           "(puede no reportar en XBRL o estar retirada del registro).", true));
         return;
       }
-      info = await api(`/api/companies/${companyId}`);
     }
     buildPeriodSelector(info.availablePeriods);
     await loadPeriod();
@@ -36,13 +57,11 @@ async function init() {
   }
 }
 
-// Botón para re-scrapear en vivo desde la SMV (demostrar tiempo real)
+// Botón para re-scrapear en vivo desde la SMV (datos frescos, año por año)
 async function refreshFromSMV() {
-  app.replaceChildren(loadingScreen(
-    "Actualizando desde la SMV…",
-    "Volviendo a descargar los estados financieros más recientes en tiempo real."));
+  const name = document.querySelector("h1")?.textContent || "la empresa";
   try {
-    await apiPost(`/api/companies/${companyId}/ensure-data`, { force: true });
+    await scrapeByYear(name, { force: true });
     const info = await api(`/api/companies/${companyId}`);
     buildPeriodSelector(info.availablePeriods);
     await loadPeriod();

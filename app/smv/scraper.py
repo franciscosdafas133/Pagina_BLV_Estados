@@ -26,7 +26,7 @@ from app.smv.account_mapping import classify_statement, map_accounts, normalize_
 BASE = "https://www.smv.gob.pe/SIMV/"
 SEARCH_URL = BASE + "Frm_InformacionFinanciera?data=A70181B60967D74090DCD93C4920AA1D769614EC12"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) proyecto-educativo-analisis"}
-THROTTLE_SECONDS = 1.0  # cortesía con el servidor público
+THROTTLE_SECONDS = 0.4  # cortesía con el servidor público (equilibrio velocidad/cortesía)
 
 
 @dataclass
